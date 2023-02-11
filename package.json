@@ -1,0 +1,10 @@
+{
+  "name": "offline-worker",
+  "version": "1.0.0",
+  "description": "service worker for pwa - use fresh then cache response",
+  "main": "index.js",
+  "repository": "https://github.com/Prozi/offline-worker.git",
+  "author": "Jacek Piętal <github.com/Prozi>",
+  "license": "MIT",
+  "private": false
+}

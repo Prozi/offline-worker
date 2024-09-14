@@ -1,4 +1,4 @@
-declare module "offline-worker" {
-  function register(): void
-  export default register
+declare module 'offline-worker' {
+  function register(path?: string): void;
+  export default register;
 }

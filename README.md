@@ -12,9 +12,9 @@ where public is your public/static directory
 then in your front-end code use:
 
 ```js
-import register from "offline-worker"
+import register from 'offline-worker';
 
-register()
+register();
 ```
 
 ## result

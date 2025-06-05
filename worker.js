@@ -1,56 +1,84 @@
 // Establish a cache name
-const hostname = self.location.hostname.replace('.', '_');
-const cacheName = hostname + '_cache';
+const hostname = self.location.hostname.replace('.', '_')
+const cacheName = hostname + '_cache'
 
-// On fetch, function can't be async
-// Otherwise the handler would not run
+self.addEventListener('install', (event) => {
+  // Activate new version of the Worker instantly
+  self.skipWaiting()
+  event.waitUntil(
+    caches.open(cacheName).then(
+      (cache) => cache.addAll(['/']) // Homepage pre-cache
+    )
+  )
+})
+
+self.addEventListener('activate', (event) => {
+  clients.claim()
+})
+
+// Helpers
+function fromCache(request) {
+  return caches
+    .open(cacheName)
+    .then((cache) => cache.match(request, { ignoreSearch: true }))
+}
+
+function updateCache(request, response) {
+  if (request.method.toLowerCase() !== 'get') return
+  return caches
+    .open(cacheName)
+    .then((cache) => cache.put(request, response.clone()))
+}
+
+// Fetch handler
 self.addEventListener('fetch', (event) => {
-  const { url, method } = event.request;
+  const { request } = event
+  const { url } = request
 
-  // Filter out queries not supported by cache
+  // Filter out requests you don't want to cache
   if (!url.match(/^https:\/\/?/) || url.match(/\/socket\.io\//)) {
-    return;
+    return
   }
 
-  // Use same-origin for same origin, attempt no-cors for rest
-  const mode = url.startsWith(self.location.origin) ? 'same-origin' : 'no-cors';
+  const mode = url.startsWith(self.location.origin) ? 'same-origin' : 'no-cors'
 
-  // Respond with fresh or cached response
   event.respondWith(
     new Promise((resolve) => {
       fetch(url, { mode })
         .then((freshResponse) => {
           if (freshResponse.status === 200) {
-            // Add the network response to the cache for future visits.
-            // Note: we need to make a copy of the response to save it in
-            // the cache and use the original as the request response.
-            caches.open(cacheName).then((cache) => {
-              if (method.toLowerCase() === 'get') {
-                cache.put(event.request, freshResponse.clone());
-              }
-
-              // Return the fresh network response
-              resolve(freshResponse);
-            });
+            // If response is OK, save it to cache and return it
+            updateCache(request, freshResponse)
+            resolve(freshResponse)
           } else {
-            caches.open(cacheName).then((cache) =>
-              cache.match(event.request).then((cachedResponse) => {
-                // Fallback on cache
-                // And if not found just return the fresh one even with bad status
-                resolve(cachedResponse || freshResponse);
-              })
-            );
+            // If status != 200, try getting it from cache
+            fromCache(request).then((cached) => {
+              if (cached) {
+                // If found in cache, return it
+                resolve(cached)
+              } else {
+                // If not in cache, return the original network response
+                resolve(freshResponse)
+              }
+            })
           }
         })
-        // eslint-disable-next-line
-        .catch((_err) => {
-          // Fallback on cache
-          return caches.open(cacheName).then((cache) =>
-            cache.match(event.request).then((cachedResponse) => {
-              resolve(cachedResponse);
-            })
-          );
-        });
+        .catch(() => {
+          // When fetch throws (e.g. offline), try getting it from cache
+          fromCache(request).then((cached) => {
+            if (cached) {
+              resolve(cached)
+            } else {
+              // If also not in cache – return a simple 503 Response
+              resolve(
+                new Response('Offline and not cached', {
+                  status: 503,
+                  headers: { 'Content-Type': 'text/plain' }
+                })
+              )
+            }
+          })
+        })
     })
-  );
-});
+  )
+})

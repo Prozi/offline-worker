@@ -1,5 +1,5 @@
-module.exports = function (path = '/worker.js') {
+module.exports = function register(path = './worker.js') {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register(path);
+    navigator.serviceWorker.register(path)
   }
-};
+}
